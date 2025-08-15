@@ -6,6 +6,7 @@ from config import BOT_TOKEN
 from db import init_db
 from handlers import start as h_start
 from handlers import order as h_order
+from handlers import admin as h_admin
 
 
 async def main():
@@ -22,7 +23,7 @@ async def main():
 
     dp.include_router(h_start.router)
     dp.include_router(h_order.router)
-
+    dp.include_router(h_admin.router)  # <- подключаем админку
     print("Telegram бот запущен. Нажми Ctrl+C для остановки.")
     await dp.start_polling(bot)
 

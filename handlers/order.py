@@ -26,23 +26,23 @@ async def picked_product(cb: CallbackQuery, state: FSMContext):
 
 @router.message(OrderFSM.waiting_game_id)
 async def got_game_id(msg: Message, state: FSMContext):
-    gid = msg.text.strip()
-    if not gid or len(gid) < 4:
-        await msg.answer("Похоже, это не похоже на ID. Повтори, пожалуйста.")
+    text = msg.text.strip()
+    import re
+    match = re.match(r"(\d+)\s*\(([^)]+)\)", text)
+    if not match:
+        await msg.answer("Неверный формат. Введите как: 12345678 (1234)")
         return
-    await state.update_data(game_id=gid)
-    await state.set_state(OrderFSM.waiting_server)
-    await msg.answer("Теперь отправьте <b>Server</b> (номер/название).")
 
-@router.message(OrderFSM.waiting_server)
-async def got_server(msg: Message, state: FSMContext):
-    server = msg.text.strip()
+    gid, server = match.groups()
+    await state.update_data(game_id=gid, game_server=server)
+
+    # Берём данные по продукту
     data = await state.get_data()
     code = data["product_code"]
     title = data["product_title"]
     base_price = data["base_price"]
-    gid = data["game_id"]
 
+    # Генерируем уникальную сумму
     uniq_amount = build_unique_amount(base_price)
 
     order_id = insert_order(
