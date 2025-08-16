@@ -1,5 +1,6 @@
 import asyncio
 import sqlite3
+
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -24,6 +25,10 @@ dp.include_router(h_admin.router)  # <- подключаем админку
 
 # --- FastAPI ---
 app = FastAPI()
+
+@app.get("/healthz")
+def health_check():
+    return {"status": "ok"}
 
 
 async def notify_user_payment(tg_user_id: int, order_id: int):
