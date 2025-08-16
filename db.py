@@ -1,6 +1,6 @@
 import sqlite3
-from datetime import datetime
-from typing import Optional, Tuple, List
+from datetime import datetime, timezone
+from typing import Optional, List
 from config import DB_PATH
 
 DDL = """
@@ -38,13 +38,14 @@ def init_db():
 
 def insert_order(tg_user_id: int, product_code: str, product_title: str,
                  base_price: int, uniq_amount: int, game_id: str, game_server: str) -> int:
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     with get_conn() as c:
         cur = c.execute(
             """INSERT INTO orders (tg_user_id, product_code, product_title, base_price, uniq_amount,
                                    game_id, game_server, status, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, 'WAITING_PAYMENT', ?, ?)""",
-            (tg_user_id, product_code, product_title, base_price, uniq_amount, game_id, game_server, now, now)
+            (tg_user_id, product_code, product_title, base_price, uniq_amount,
+             game_id, game_server, now, now)
         )
         return cur.lastrowid
 
@@ -62,8 +63,15 @@ def get_open_amounts() -> set:
         cur = c.execute("SELECT uniq_amount FROM orders WHERE status='WAITING_PAYMENT'")
         return {r["uniq_amount"] for r in cur.fetchall()}
 
+def mark_order_paid(order_id: int) -> None:
+    with get_conn() as c:
+        c.execute(
+            "UPDATE orders SET status='PAID', updated_at=? WHERE id=?",
+            (datetime.now(timezone.utc).isoformat(), order_id)
+        )
+
 def mark_paid_by_amount(amount: int) -> Optional[int]:
-    """Заготовка на будущее (матчинг по сумме). Вернёт order_id или None."""
+    """Ищет заказ по уникальной сумме, отмечает оплаченным. Возвращает order_id или None."""
     with get_conn() as c:
         cur = c.execute(
             "SELECT id FROM orders WHERE uniq_amount=? AND status='WAITING_PAYMENT'",
@@ -75,6 +83,14 @@ def mark_paid_by_amount(amount: int) -> Optional[int]:
         order_id = row["id"]
         c.execute(
             "UPDATE orders SET status='PAID', updated_at=? WHERE id=?",
-            (datetime.utcnow().isoformat(), order_id)
+            (datetime.now(timezone.utc).isoformat(), order_id)
         )
         return order_id
+
+def get_order_by_amount(amount: int) -> Optional[sqlite3.Row]:
+    with get_conn() as c:
+        cur = c.execute(
+            "SELECT * FROM orders WHERE uniq_amount=? AND status='WAITING_PAYMENT'",
+            (amount,)
+        )
+        return cur.fetchone()
